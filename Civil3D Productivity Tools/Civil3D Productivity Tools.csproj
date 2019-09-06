@@ -77,6 +77,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppContext.cs" />
+    <Compile Include="AreaCalculator.cs" />
     <Compile Include="Helper.cs" />
     <Compile Include="MyApp.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
