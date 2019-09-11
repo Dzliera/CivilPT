@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Mime;
 using System.Text;
 using System.Threading.Tasks;
+using Autodesk.Aec.DatabaseServices;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
@@ -302,6 +303,59 @@ namespace Civil3D_Productivity_Tools
 
             return new Tuple<double, double>(cutArea, fillArea);
         }
+
+
+        private Tuple<double, double> CalculateArea(Transaction t, Polyline pEx, Polyline pMid, Polyline pDesign)
+        {
+            var start = (new List<double>(){pEx.StartPoint.X, pMid.StartPoint.X, pDesign.StartPoint.X}).Max();
+            var end = (new List<double>(){pEx.EndPoint.X, pMid.EndPoint.X, pDesign.EndPoint.X}).Min();
+
+            var minY = double.MaxValue;
+            var maxY = double.MinValue;
+
+            UpdateMaxMinY(pEx, ref minY, ref maxY);
+            UpdateMaxMinY(pMid, ref minY, ref maxY);
+            UpdateMaxMinY(pDesign, ref minY, ref maxY);
+
+            var step = 0.1;
+            var cut = 0d;
+            var fill = 0d;
+
+            for (var i = start; i < end; i+=step)
+            {
+                var line = new  Line(new Point3d(i, minY, 0), new Point3d(i, maxY, 0));
+                var col = new Point3dCollection();
+                line.IntersectWith(pEx, Intersect.OnBothOperands, col, IntPtr.Zero,  IntPtr.Zero);
+                var pExY = col[0].Y;
+                col = new Point3dCollection();
+                line.IntersectWith(pMid, Intersect.OnBothOperands, col, IntPtr.Zero, IntPtr.Zero);
+                var pMidY = col[0].Y;
+                col = new Point3dCollection();
+                line.IntersectWith(pMid, Intersect.OnBothOperands, col, IntPtr.Zero, IntPtr.Zero);
+                var pDesignY = col[0].Y;
+                if (pDesignY > pExY)
+                {
+                    if(pMidY < pExY) continue;
+                    if (pMidY > pExY && pMidY < pDesignY) fill += pMidY - pExY;
+                }
+            }
+            
+
+
+            throw new NotImplementedException();
+        }
+
+        private static void UpdateMaxMinY(Polyline pol,  ref double minY,  ref double maxY)
+        {
+            for (int i = 0; i < pol.NumberOfVertices; i++)
+            {
+                var p = pol.GetPoint2dAt(i);
+                var y = p.Y;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+
 
         private Point2d CalculateMedianPoint(Polyline pol)
         {
