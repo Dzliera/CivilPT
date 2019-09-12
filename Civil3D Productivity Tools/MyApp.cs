@@ -116,7 +116,6 @@ namespace Civil3D_Productivity_Tools
                 {
                     var view1 = (SectionView)t.GetObject(ids1[i], OpenMode.ForRead);
                     var view2 = (SectionView)t.GetObject(ids2[i], OpenMode.ForRead);
-                    
                 }
             });
         }
@@ -130,31 +129,35 @@ namespace Civil3D_Productivity_Tools
                 AllowDuplicates = false,
             };
 
-            var polyline = DBDictionary.GetClass(typeof(Polyline)).DxfName;
+            var polyLine = DBDictionary.GetClass(typeof(Polyline)).DxfName;
             var filter = new SelectionFilter(new[]
             {
-                new TypedValue((int)DxfCode.Start, polyline),
+                new TypedValue((int)DxfCode.Start, polyLine),
             });
 
-            ED.WriteMessage("Select First PLine");
+            ED.WriteMessage("Select EG PLine");
             var selection1 = ED.GetSelection(sOptions, filter);
 
             if (selection1.Status != PromptStatus.OK) return;
 
             var id1 = selection1.Value.GetObjectIds()[0];
 
-            ED.WriteMessage("Select Second PLine");
+            ED.WriteMessage("Select Intermediate PLine");
             var selection2 = ED.GetSelection(sOptions, filter);
-
             if (selection2.Status != PromptStatus.OK) return;
-
             var id2 = selection2.Value.GetObjectIds()[0];
+
+            ED.WriteMessage("Select Design PLine");
+            var selection3 = ED.GetSelection(sOptions, filter);
+            if(selection3.Status != PromptStatus.OK) return;
+            var id3 = selection3.Value.GetObjectIds()[0];
 
             TInvoke(t =>
             {
                 var p1 = (Polyline)t.GetObject(id1, OpenMode.ForRead);
                 var p2 = (Polyline)t.GetObject(id2, OpenMode.ForRead);
-                var (cut, fill) = CalculateArea(t, p1, p2);
+                var p3 = (Polyline)t.GetObject(id3, OpenMode.ForRead);
+                var (cut, fill) = CalculateArea(t, p1, p2, p3);
 
                 ED.WriteMessage($"Cut: {cut.ToString("N", NFormat)}, Fill: {fill.ToString("N", NFormat)}");
                 ED.WriteMessage("Select Point To Place Labels:");
@@ -331,23 +334,26 @@ namespace Civil3D_Productivity_Tools
                 line.IntersectWith(pMid, Intersect.OnBothOperands, col, IntPtr.Zero, IntPtr.Zero);
                 var pMidY = col[0].Y;
                 col = new Point3dCollection();
-                line.IntersectWith(pMid, Intersect.OnBothOperands, col, IntPtr.Zero, IntPtr.Zero);
+                line.IntersectWith(pDesign, Intersect.OnBothOperands, col, IntPtr.Zero, IntPtr.Zero);
                 var pDesignY = col[0].Y;
                 if (pDesignY > pExY)
                 {
                     if(pMidY < pExY) continue;
-                    if (pMidY > pExY && pMidY < pDesignY) fill += pMidY - pExY;
+                    if (pMidY > pExY && pMidY < pDesignY) fill += (pMidY - pExY) * step;
+                }
+                else
+                {
+                    if(pMidY > pExY) continue;
+                    if (pMidY < pExY && pMidY > pDesignY) cut += (pExY - pMidY) * step;
                 }
             }
             
-
-
-            throw new NotImplementedException();
+            return new Tuple<double, double>(cut, fill);
         }
 
         private static void UpdateMaxMinY(Polyline pol,  ref double minY,  ref double maxY)
         {
-            for (int i = 0; i < pol.NumberOfVertices; i++)
+            for (var i = 0; i < pol.NumberOfVertices; i++)
             {
                 var p = pol.GetPoint2dAt(i);
                 var y = p.Y;
